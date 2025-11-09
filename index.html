@@ -1,0 +1,570 @@
+﻿<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grocery Price Tracker</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load html5-qrcode for barcode scanning -->
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- Load Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="manifest" href="/manifest.webmanifest">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom style for the notification */
+        #notification {
+            transition: opacity 0.5s, transform 0.5s;
+        }
+        
+        /* Style for the input group with button */
+        .input-with-button {
+            display: flex;
+            align-items: center;
+        }
+        .input-with-button input {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            flex-grow: 1;
+        }
+        .input-with-button button {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+    <div class="max-w-3xl mx-auto p-4">
+        
+        <!-- Header -->
+        <header class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h1 class="text-3xl font-bold text-center text-blue-600">Our Grocery Tracker</h1>
+            <p class="text-center text-gray-600 mt-2">Welcome! Add items while shopping or browse your saved products.</p>
+            <p id="userIdDisplay" class="text-center text-xs text-gray-400 mt-4"></p>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="flex justify-center gap-4 mb-6">
+            <button id="showBrowseBtn" class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg shadow hover:bg-blue-700 transition duration-300">
+                Browse Products
+            </button>
+            <button id="showShoppingBtn" class="bg-gray-200 text-gray-800 font-semibold py-2 px-6 rounded-lg shadow hover:bg-gray-300 transition duration-300">
+                Go Shopping
+            </button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main id="app-content">
+
+            <!-- "Go Shopping" Page -->
+            <section id="shopping-page" class="hidden">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-4">Add Item</h2>
+                    
+                    <!-- Barcode Scanner -->
+                    <button type="button" id="startScanBtn" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-blue-700 transition duration-300 mb-4">
+                        Scan Barcode with Camera
+                    </button>
+                    <!-- This div is where the camera feed will appear -->
+                    <div id="reader" class="w-full rounded-lg overflow-hidden border border-gray-300 mb-4 hidden" style="max-height: 400px;"></div>
+                    <button type="button" id="stopScanBtn" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-red-700 transition duration-300 mb-4 hidden">
+                        Stop Scanning
+                    </button>
+
+                    <p class="text-gray-600 mb-6 text-center">...or enter details manually below.</p>
+                    
+                    <form id="addItemForm" class="space-y-4">
+                        <div>
+                            <label for="barcode" class="block text-sm font-medium text-gray-700">Barcode (UPC)</label>
+                            <div class="input-with-button mt-1">
+                                <input type="text" id="barcode" name="barcode" required class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                                <button type="button" id="lookupBtn" class="px-4 py-2 border border-l-0 border-gray-300 bg-gray-50 text-sm font-medium text-gray-700 rounded-r-md hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    Lookup
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label for="productName" class="block text-sm font-medium text-gray-700">Product Name</label>
+                            <input type="text" id="productName" name="productName" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <p class="mt-1 text-xs text-gray-500">Only needed for the first scan of a new item.</p>
+                        </div>
+                        
+                        <div>
+                            <label for="price" class="block text-sm font-medium text-gray-700">Current Price (₱)</label>
+                            <input type="number" id="price" name="price" step="0.01" min="0" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        
+                        <div>
+                            <label for="store" class="block text-sm font-medium text-gray-700">Store</label>
+                            <input type="text" id="store" name="store" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="e.g., SM, Gaisano, Robinson's">
+                        </div>
+
+                        <!-- Changed from type="submit" to type="button" to prevent form submission -->
+                        <button type="button" id="saveItemBtn" class="w-full bg-green-600 text-white font-bold py-3 px-4 rounded-lg shadow hover:bg-green-700 transition duration-300">
+                            Save Item & Price
+                        </button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- "Browse Products" Page -->
+            <section id="browse-page">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">Saved Products</h2>
+                <div id="product-list" class="space-y-4">
+                    <!-- Products will be injected here by JavaScript -->
+                    <p id="loading-message" class="text-center text-gray-500">Loading your products...</p>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Notification Pop-up -->
+    <div id="notification" class="fixed bottom-6 right-6 bg-green-600 text-white py-3 px-6 rounded-lg shadow-lg opacity-0 transform translate-y-4">
+        <span id="notification-message"></span>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            updateDoc, 
+            arrayUnion, 
+            collection, 
+            onSnapshot,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- GLOBAL VARIABLES ---
+        let db, auth;
+        let userId;
+        let productsCollectionRef;
+        let html5QrCode; // Variable to hold the scanner object
+        
+        // --- PERMANENT APP ID ---
+        // **CRITICAL FIX:** This now uses the environment-provided __app_id.
+        // This *solves* the "Missing or insufficient permissions" error and ensures
+        // you and Angie always connect to the one, true, shared database.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id'; 
+        
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+
+        // --- DOM Elements ---
+        const shoppingPage = document.getElementById('shopping-page');
+        const browsePage = document.getElementById('browse-page');
+        const showShoppingBtn = document.getElementById('showShoppingBtn');
+        const showBrowseBtn = document.getElementById('showBrowseBtn');
+        const addItemForm = document.getElementById('addItemForm');
+        const saveItemBtn = document.getElementById('saveItemBtn'); // Get the save button
+        const productList = document.getElementById('product-list');
+        const loadingMessage = document.getElementById('loading-message');
+        const userIdDisplay = document.getElementById('userIdDisplay');
+        const notification = document.getElementById('notification');
+        const notificationMessage = document.getElementById('notification-message');
+        // Scanner elements
+        const startScanBtn = document.getElementById('startScanBtn');
+        const stopScanBtn = document.getElementById('stopScanBtn');
+        const readerDiv = document.getElementById('reader');
+        const barcodeInput = document.getElementById('barcode');
+        const productNameInput = document.getElementById('productName');
+        const priceInput = document.getElementById('price');
+        const storeInput = document.getElementById('store');
+        const lookupBtn = document.getElementById('lookupBtn');
+
+
+        // --- INITIALIZATION ---
+        
+        async function initializeFirebase() {
+            try {
+                // Initialize Firebase
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setLogLevel('Debug'); // Enable detailed logs for debugging
+
+                // Sign in the user
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("User signed in with UID:", userId);
+                        // Update the display to show the friendly name
+                        userIdDisplay.textContent = `Jay (Admin) - Shared DB`;
+                        
+                        // Set up Firestore collection reference to the SHARED public path
+                        // This path uses the correct appId from the environment.
+                        productsCollectionRef = collection(db, `artifacts/${appId}/public/data/products`);
+                        
+                        // Start listening for product updates
+                        loadProducts();
+
+                    } else {
+                        console.log("No user signed in, attempting auth...");
+                        try {
+                            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                                await signInWithCustomToken(auth, __initial_auth_token);
+                            } else {
+                                await signInAnonymously(auth);
+                            }
+                        } catch (authError) {
+                            console.error("Error during authentication:", authError);
+                            showNotification("Error authenticating. Please refresh.", "error");
+                        }
+                    }
+                });
+
+            } catch (e) {
+                console.error("Error initializing Firebase:", e);
+                loadingMessage.textContent = "Error loading app. Could not connect to database.";
+            }
+        }
+
+        // --- NAVIGATION ---
+
+        function showPage(page) {
+            if (page === 'shopping') {
+                shoppingPage.classList.remove('hidden');
+                browsePage.classList.add('hidden');
+                showShoppingBtn.classList.add('bg-blue-600', 'text-white');
+                showShoppingBtn.classList.remove('bg-gray-200', 'text-gray-800');
+                showBrowseBtn.classList.add('bg-gray-200', 'text-gray-800');
+                showBrowseBtn.classList.remove('bg-blue-600', 'text-white');
+            } else {
+                browsePage.classList.remove('hidden');
+                shoppingPage.classList.add('hidden');
+                showBrowseBtn.classList.add('bg-blue-600', 'text-white');
+                showBrowseBtn.classList.remove('bg-gray-200', 'text-gray-800');
+                showShoppingBtn.classList.add('bg-gray-200', 'text-gray-800');
+                showShoppingBtn.classList.remove('bg-blue-600', 'text-white');
+            }
+        }
+
+        showShoppingBtn.addEventListener('click', () => showPage('shopping'));
+        showBrowseBtn.addEventListener('click', () => showPage('browse'));
+
+        // --- BARCODE SCANNER & LOOKUP LOGIC ---
+
+        function onScanSuccess(decodedText, decodedResult) {
+            // Handle the scanned code
+            console.log(`Code matched = ${decodedText}`, decodedResult);
+            barcodeInput.value = decodedText; // Populate the barcode input
+            stopScanner(); // Stop the camera
+            showNotification("Scan successful! Looking up product...", "success");
+            fetchProductInfo(decodedText); // Try to find the product name
+        }
+
+        function onScanFailure(error) {
+            // This function is called frequently, even when no barcode is in view.
+            // We can ignore it to allow continuous scanning.
+        }
+
+        function startScanner() {
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            readerDiv.classList.remove('hidden');
+            stopScanBtn.classList.remove('hidden');
+            startScanBtn.classList.add('hidden'); 
+
+            html5QrCode.start(
+                { facingMode: "environment" }, // Use the back camera on mobile
+                config,
+                onScanSuccess,
+                onScanFailure
+            ).catch((err) => {
+                console.error("Unable to start scanning.", err);
+                showNotification("Could not start camera. Please check permissions.", "error");
+                stopScanner(); 
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    console.log("Scanner stopped.");
+                    readerDiv.classList.add('hidden');
+                    stopScanBtn.classList.add('hidden');
+                    startScanBtn.classList.remove('hidden'); 
+                }).catch((err) => {
+                    console.error("Failed to stop scanner.", err);
+                    readerDiv.classList.add('hidden');
+                    stopScanBtn.classList.add('hidden');
+                    startScanBtn.classList.remove('hidden');
+                });
+            } else {
+                readerDiv.classList.add('hidden');
+                stopScanBtn.classList.add('hidden');
+                startScanBtn.classList.remove('hidden');
+            }
+        }
+        
+        async function fetchProductInfo(barcode) {
+            if (!barcode) {
+                showNotification("Please enter a barcode first.", "error");
+                return;
+            }
+            
+            showNotification("Looking up barcode...", "success");
+            
+            try {
+                // Using Open Food Facts API
+                const response = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+                
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+
+                const data = await response.json();
+
+                if (data.status === 1 && data.product && data.product.product_name) {
+                    productNameInput.value = data.product.product_name; 
+                    showNotification("Product name populated!", "success");
+                } else {
+                    showNotification("Product not found in database. Please enter name manually.", "error");
+                }
+            } catch (e) {
+                console.error("Error fetching product info:", e);
+                showNotification("Could not look up product. Please enter name manually.", "error");
+            }
+        }
+
+        // --- Event Listeners for Scanner and Lookup ---
+        startScanBtn.addEventListener('click', startScanner);
+        stopScanBtn.addEventListener('click', stopScanner);
+
+        lookupBtn.addEventListener('click', () => {
+            fetchProductInfo(barcodeInput.value);
+        });
+
+
+        // --- FIRESTORE & APP LOGIC ---
+
+        // 1. Add/Update Item (Attached to the button's click event)
+        async function saveItem() {
+            const barcode = barcodeInput.value.trim();
+            const productName = productNameInput.value.trim();
+            const price = parseFloat(priceInput.value);
+            const store = storeInput.value.trim() || 'N/A'; // Get store, default to 'N/A'
+
+            if (!barcode || isNaN(price) || price <= 0) {
+                showNotification("Valid Barcode and Price are required.", "error");
+                return;
+            }
+
+            if (!productsCollectionRef) {
+                showNotification("Database not connected. Please wait.", "error");
+                return;
+            }
+
+            const productRef = doc(productsCollectionRef, barcode);
+            
+            try {
+                const productSnap = await getDoc(productRef);
+                const newPriceEntry = {
+                    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+                    price: price,
+                    store: store // Add the store name
+                };
+
+                if (productSnap.exists()) {
+                    // --- Product EXISTS ---
+                    const updateData = {
+                        priceHistory: arrayUnion(newPriceEntry)
+                    };
+                    // Only update the name if it's currently blank/missing and the user provided one
+                    if (productName && (!productSnap.data().name || productSnap.data().name === "")) {
+                        updateData.name = productName;
+                    }
+                    await updateDoc(productRef, updateData);
+                    showNotification("Price updated for existing item!", "success");
+                } else {
+                    // --- Product is NEW ---
+                    if (!productName) {
+                        showNotification("Product Name is required for new items.", "error");
+                        return;
+                    }
+                    await setDoc(productRef, {
+                        name: productName,
+                        barcode: barcode,
+                        priceHistory: [newPriceEntry] 
+                    });
+                    showNotification("New product added!", "success");
+                }
+                
+                addItemForm.reset();
+                showPage('browse');
+
+            } catch (e) {
+                console.error("Error saving item:", e);
+                showNotification("Error saving item. Check console.", "error");
+            }
+        }
+        
+        // Attach the save function to the button's click event
+        saveItemBtn.addEventListener('click', saveItem);
+
+        // 2. Load and Display Products
+        function loadProducts() {
+            if (!productsCollectionRef) {
+                console.warn("Product collection ref not ready, skipping load.");
+                return;
+            }
+
+            onSnapshot(productsCollectionRef, (querySnapshot) => {
+                if (querySnapshot.empty) {
+                    loadingMessage.textContent = "No products added yet. Go to the 'Go Shopping' tab to add your first item!";
+                    productList.innerHTML = ''; // Clear any existing items
+                    return;
+                }
+
+                productList.innerHTML = '';
+                loadingMessage.textContent = '';
+
+                let products = [];
+                querySnapshot.forEach((doc) => {
+                    products.push(doc.data());
+                });
+
+                // Sort products by name, A-Z
+                products.sort((a, b) => a.name.localeCompare(b.name));
+
+                products.forEach((product) => {
+                    const stats = calculateStats(product.priceHistory);
+                    const productCard = createProductCard(product, stats);
+                    productList.appendChild(productCard);
+                });
+
+            }, (error) => {
+                console.error("Error fetching products:", error);
+                loadingMessage.textContent = "Error fetching products: " + error.message;
+            });
+        }
+
+        // 3. Calculate Price Statistics
+        function calculateStats(priceHistory) {
+            if (!priceHistory || priceHistory.length === 0) {
+                return { high: 0, low: 0, avg: 0, latestPrice: 0, isGoodDeal: false, targetPrice: 0 };
+            }
+
+            const prices = priceHistory.map(entry => entry.price);
+            const high = Math.max(...prices);
+            const low = Math.min(...prices);
+            const sum = prices.reduce((a, b) => a + b, 0);
+            const avg = parseFloat((sum / prices.length).toFixed(2));
+            const latestPrice = prices[prices.length - 1];
+            
+            const isGoodDeal = latestPrice <= avg;
+            const targetPrice = low;
+
+            return { high, low, avg, latestPrice, isGoodDeal, targetPrice };
+        }
+
+        // 4. Create HTML for a Product Card
+        function createProductCard(product, stats) {
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md p-5 border border-gray-200';
+
+            const goodDealColor = stats.isGoodDeal ? 'text-green-600' : 'text-red-600';
+            const goodDealText = stats.isGoodDeal ? 'Yes! Good Deal!' : 'Not a good deal';
+
+            let historyHtml = product.priceHistory.map(entry => 
+                `<li class="text-sm text-gray-600">${entry.date}: <span class="font-medium">₱${entry.price.toFixed(2)}</span> (at ${entry.store || 'N/A'})</li>`
+            ).reverse().slice(0, 5).join(''); 
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h3 class="text-xl font-bold text-gray-900">${product.name}</h3>
+                        <p class="text-xs text-gray-500 mb-4">UPC: ${product.barcode}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-500">Latest Price</p>
+                        <p class="text-3xl font-bold text-blue-600">₱${stats.latestPrice.toFixed(2)}</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 border-t pt-4">
+                    <!-- Deal Status -->
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Good Deal?</p>
+                        <p class="text-lg font-bold ${goodDealColor}">${goodDealText}</p>
+                    </div>
+                    <!-- Target Price -->
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Target (Low)</p>
+                        <p class="text-lg font-bold text-gray-800">₱${stats.targetPrice.toFixed(2)}</p>
+                    </div>
+                    <!-- Average Price -->
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Average Price</p>
+                        <p class="text-lg font-bold text-gray-800">₱${stats.avg.toFixed(2)}</p>
+                    </div>
+                    <!-- High Price -->
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">All-Time High</p>
+                        <p class="text-lg font-bold text-gray-800">₱${stats.high.toFixed(2)}</I/p>
+                    </div>
+                </div>
+                
+                <div class="mt-4 border-t pt-4">
+                    <h4 class="text-sm font-medium text-gray-500 mb-2">Recent Price History (Newest First):</h4>
+                    <ul class="space-y-1">
+                        ${historyHtml}
+                        ${product.priceHistory.length > 5 ? '<li class="text-xs text-gray-400">...and more</li>' : ''}
+                    </ul>
+                </div>
+            `;
+            return card;
+        }
+
+        // --- UTILITY ---
+
+        let notificationTimeout;
+        function showNotification(message, type = 'success') {
+            notificationMessage.textContent = message;
+
+            if (type === 'error') {
+                notification.classList.remove('bg-green-600');
+                notification.classList.add('bg-red-600');
+            } else {
+                notification.classList.remove('bg-red-600');
+                notification.classList.add('bg-green-600');
+            }
+
+            if (notificationTimeout) {
+                clearTimeout(notificationTimeout);
+            }
+
+            notification.classList.remove('opacity-0', 'translate-y-4');
+            
+            notificationTimeout = setTimeout(() => {
+                notification.classList.add('opacity-0', 'translate-y-4');
+            }, 3000);
+        }
+
+        // --- START THE APP ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeFirebase();
+            showPage('browse'); 
+
+            html5QrCode = new Html5Qrcode("reader");
+        });
+
+    </script>
+</body>
+</html>
