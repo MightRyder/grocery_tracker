@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
@@ -129,6 +129,26 @@
     <div id="notification" class="fixed bottom-6 right-6 bg-green-600 text-white py-3 px-6 rounded-lg shadow-lg opacity-0 transform translate-y-4">
         <span id="notification-message"></span>
     </div>
+
+    <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyCZmFIcDpkvAz4yuKhkc6068wHQIUKZvtg",
+    authDomain: "grocery-tracker-b9a3b.firebaseapp.com",
+    projectId: "grocery-tracker-b9a3b",
+    storageBucket: "grocery-tracker-b9a3b.firebasestorage.app",
+    messagingSenderId: "592902196011",
+    appId: "1:592902196011:web:3641b566e037114df2136e"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
 
     <!-- Firebase SDK -->
     <script type="module">
